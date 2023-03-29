@@ -8,6 +8,7 @@ packages = [{include = "cross_national_mobility_visualizer"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+matplotlib = "^3.7.1"
 
 
 [build-system]
