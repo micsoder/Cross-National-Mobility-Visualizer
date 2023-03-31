@@ -3,14 +3,26 @@ class Ui():
 
     def __init__(self):
         pass
+
+    def title(self):
+        print("Automated visualizastion of cross national border mobility")
+
  
     def question1(self):
         
-        command = int(input("Insert first question here: "))
+        command = input("Add country (abbreviation) or exit program (exit): ")
         return command
      
     def question2(self):
 
-        command = int(input("Insert second question: "))
+        command = input("Add country (abbreviation) or exit program (exit): ")
+        return command
+
+    def question3(self):
+        print("What do you want to do?")
+        print("The available options are:")
+        print("Kernel Density Estimation plotting (KDE)")
+
+        command = input("Analysis: ")
         return command
     

@@ -34,24 +34,46 @@ class Main():
             break
                 
         print(f"Command {command} accepted")
-        print("Program ends here")
+        self.analysis_question()
+
+    def analysis_question(self):
+
+        while True:
+            command = self.ui.question3()
+            value = self.__take_command3(command)
+
+            if value is False:
+                print(f'Analysis "{command}" not recognized')
+                continue
+            break
 
     def __take_command1(self, command):
 
-        if command == 0:
-            return True
+        if command == "exit":
+            return False
 
-        if command == 1:
+        if command == 'FR':
             return True
         
         return False
 
+
     def __take_command2(self, command):
 
-        if command == 0:
+        if command == 'exit':
+            return False
+
+        if command == 'LU':
             return True
 
-        if command == 1:
+        return False
+
+    def __take_command3(self, command):
+
+        if command == 'exit':
+            return False
+
+        if command == 'KDE':
             return True
 
         return False
