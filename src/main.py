@@ -2,8 +2,9 @@
 
 class Main():
 
-    def __init__(self, ui):
+    def __init__(self, ui, input_packager):
         self.ui = ui
+        self.input_packager = input_packager
 
 
     def start(self):
@@ -53,6 +54,7 @@ class Main():
             return False
 
         if command == 'FR':
+            self.input_packager.add_country(command)
             return True
         
         return False
@@ -64,6 +66,7 @@ class Main():
             return False
 
         if command == 'LU':
+            self.input_packager.add_country(command)
             return True
 
         return False
@@ -74,6 +77,7 @@ class Main():
             return False
 
         if command == 'KDE':
+            self.input_packager.add_analysis(command)
             return True
 
         return False
