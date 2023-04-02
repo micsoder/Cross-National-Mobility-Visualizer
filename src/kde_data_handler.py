@@ -1,5 +1,8 @@
 import pandas as pd 
 import geopandas as gpd
+import seaborn as sns
+import contextily as ctx
+import matplotlib.pyplot as plt
 
 class KdeDataHandler():
     
@@ -9,27 +12,20 @@ class KdeDataHandler():
 
 
     def start_processing(self):
-
+        
+        print("Data processing starting...")
         self.df = self.__csv_to_df()        
         self.country_pair_df = self.__create_df_of_cntr_od(self.cntr_od_tuple)
         self.country_pair_gdf = self.__create_country_pair_gdf()
         self.country_1_coordinates = self.__country_coords_gdf(self.countries[0])
         self.country_2_coordinates = self.__country_coords_gdf(self.countries[1])
+        print("Data processing done...")
+
 
     def visualize(self):
-        
-        #print(self.country_pair_gdf.head())
-        print('first country:')
-        print(self.country_1_coordinates.head())
-        print(self.country_1_coordinates['CNTR_ID_start'].head())
-        print(self.country_1_coordinates['CNTR_ID_end'].tail())
-
-        print('')
-        print('second country:')
-
-        print(self.country_2_coordinates.head())
-        print(self.country_2_coordinates['CNTR_ID_start'].head())
-        print(self.country_2_coordinates['CNTR_ID_end'].tail())
+        print("Visualization starting...")
+        self.kde_plot(self.country_2_coordinates)
+        print("Visualization done...")
 
 
     def __csv_to_df(self):
@@ -88,10 +84,45 @@ class KdeDataHandler():
             filtered_end_gdf = filtered_end_gdf.rename(columns={'geometry_of_end': 'geometry'})
         
         country_gdf = pd.concat([filtered_start_gdf, filtered_end_gdf])
+        country_gdf = country_gdf.dropna()
 
         return country_gdf
     
-    
+    def kde_plot(self, country):
+
+        # Create a figure and axes for the plot
+        fig, ax = plt.subplots(figsize=(10, 8))
+
+        # Plot the kernel density estimate of start locations as a contour plot
+        sns.kdeplot(
+            x = country.geometry.x,
+            y = country.geometry.y,
+            cmap = 'viridis',
+            fill = True,
+            alpha = 0.5,
+            ax = ax,
+            levels = self.contour_intervalls(8)
+        )
+        
+        ctx.add_basemap(ax=ax,  crs = country.crs.to_string(), source=ctx.providers.OpenStreetMap.Mapnik)
+
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
+        ax.set_title('Kernel Density Plot of Mobility Data')
+
+        plt.show()
+
+    def contour_intervalls(self, number_of_intervalls):
+        first_intervall_value = 0.05
+        actual_intervalls = number_of_intervalls - 1
+        intervall = 1/number_of_intervalls
+        value = 0 
+        levels_list = []
+        levels_list.append(first_intervall_value)
+        for i in range(actual_intervalls):
+            value += intervall
+            levels_list.append(value)
+        return levels_list
 
         
 
