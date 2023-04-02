@@ -100,8 +100,9 @@ class Main():
         
         if command == 'yes':
             kde_handler = KdeDataHandler(self.input_packager.countries)
-            kde_handler.start_analysis()
+            kde_handler.start_processing()
             kde_handler.visualize()
+
             return True
         
         else:

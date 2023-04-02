@@ -8,17 +8,29 @@ class KdeDataHandler():
         self.cntr_od_tuple = self.__get_cntr_od(self.countries)
 
 
-    def start_analysis(self):
+    def start_processing(self):
 
         self.df = self.__csv_to_df()        
         self.country_pair_df = self.__create_df_of_cntr_od(self.cntr_od_tuple)
         self.country_pair_gdf = self.__create_country_pair_gdf()
-
+        self.country_1_coordinates = self.__country_coords_gdf(self.countries[0])
+        self.country_2_coordinates = self.__country_coords_gdf(self.countries[1])
 
     def visualize(self):
         
-        print(self.country_pair_gdf.head())
-        print(self.country_pair_gdf['CNTR_OD'].head()) 
+        #print(self.country_pair_gdf.head())
+        print('first country:')
+        print(self.country_1_coordinates.head())
+        print(self.country_1_coordinates['CNTR_ID_start'].head())
+        print(self.country_1_coordinates['CNTR_ID_end'].tail())
+
+        print('')
+        print('second country:')
+
+        print(self.country_2_coordinates.head())
+        print(self.country_2_coordinates['CNTR_ID_start'].head())
+        print(self.country_2_coordinates['CNTR_ID_end'].tail())
+
 
     def __csv_to_df(self):
         
@@ -60,5 +72,31 @@ class KdeDataHandler():
         country_pair_gdf['geometry_of_end'] = gdf_end['geometry']
 
         return country_pair_gdf
+    
+
+    def __country_coords_gdf(self, country):
+
+        filtered_start_gdf = self.country_pair_gdf.loc[self.country_pair_gdf['CNTR_ID_start'].isin([country])]
+        filtered_end_gdf = self.country_pair_gdf.loc[self.country_pair_gdf['CNTR_ID_end'].isin([country])]
+
+        if not filtered_start_gdf.empty:
+            filtered_start_gdf = filtered_start_gdf.drop(columns=['geometry_of_end'])
+            filtered_start_gdf = filtered_start_gdf.rename(columns={'geometry_of_start': 'geometry'})
+
+        if not filtered_end_gdf.empty:
+            filtered_end_gdf = filtered_end_gdf.drop(columns=['geometry_of_start'])
+            filtered_end_gdf = filtered_end_gdf.rename(columns={'geometry_of_end': 'geometry'})
+        
+        country_gdf = pd.concat([filtered_start_gdf, filtered_end_gdf])
+
+        return country_gdf
+    
+    
+
+        
+
+
+
+
 
 
