@@ -26,3 +26,7 @@ class Ui():
         command = input("Analysis: ")
         return command
     
+    def start_program(self):
+        
+        command = input('Do you want to start the program (yes): ')
+        return command

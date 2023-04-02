@@ -1,9 +1,11 @@
 from main import Main
 from ui import Ui
+from input_packager import InputPackager
 
 def index():
     ui = Ui()
-    app = Main(ui)
+    input_packager = InputPackager()
+    app = Main(ui, input_packager)
     app.start()
 
 
