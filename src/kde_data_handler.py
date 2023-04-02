@@ -4,6 +4,7 @@ import seaborn as sns
 import contextily as ctx
 import matplotlib.pyplot as plt
 
+
 class KdeDataHandler():
     
     def __init__(self, countries):
@@ -59,6 +60,8 @@ class KdeDataHandler():
         self.country_pair_df, geometry = gpd.points_from_xy(lon, lat))
 
         gdf = gdf.set_crs(epsg=3857)
+        gdf = gdf.to_crs(3857)
+
 
         return gdf
         
@@ -104,7 +107,13 @@ class KdeDataHandler():
             levels = self.contour_intervalls(8)
         )
         
-        ctx.add_basemap(ax=ax,  crs = country.crs.to_string(), source=ctx.providers.OpenStreetMap.Mapnik)
+
+        # Specify the extent of the basemap using the total bounds of the data
+        extent = country.total_bounds
+        ax.set_xlim(extent[0], extent[2])
+        ax.set_ylim(extent[1], extent[3])
+
+        ctx.add_basemap(ax = ax,  crs = country.crs.to_string(), source=ctx.providers.OpenStreetMap.Mapnik, zoom=19)
 
         ax.set_xlabel('Longitude')
         ax.set_ylabel('Latitude')
