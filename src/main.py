@@ -47,6 +47,8 @@ class Main():
                 print(f'Analysis "{command}" not recognized')
                 continue
             break
+
+        self.start_program_question()
     
     def start_program_question(self):
 

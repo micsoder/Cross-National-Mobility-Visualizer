@@ -17,11 +17,12 @@ class KdeDataHandler():
 
     def visualize(self):
         
-        print(self.country_pair_gdf.head()) 
+        print(self.country_pair_gdf.head())
+        print(self.country_pair_gdf['CNTR_OD'].head()) 
 
     def __csv_to_df(self):
         
-        return pd.read.csv('mobility_data.csv', sep = ',')
+        return pd.read_csv('mobility_data.csv', sep = ',')
         
 
     def __get_cntr_od(self, countries):
