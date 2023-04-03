@@ -1,8 +1,10 @@
 import pandas as pd 
 import geopandas as gpd
 import seaborn as sns
-import contextily as ctx
+import contextily
 import matplotlib.pyplot as plt
+import folium
+import pyproj
 
 
 class KdeDataHandler():
@@ -10,6 +12,7 @@ class KdeDataHandler():
     def __init__(self, countries):
         self.countries = countries
         self.cntr_od_tuple = self.__get_cntr_od(self.countries)
+        self.cntr_id_country = self.__get_cntr_id(self.countries)
 
 
     def start_processing(self):
@@ -20,12 +23,14 @@ class KdeDataHandler():
         self.country_pair_gdf = self.__create_country_pair_gdf()
         self.country_1_coordinates = self.__country_coords_gdf(self.countries[0])
         self.country_2_coordinates = self.__country_coords_gdf(self.countries[1])
+        self.gpkg_file = self.read_gpkg_file()
         print("Data processing done...")
 
 
     def visualize(self):
         print("Visualization starting...")
-        self.kde_plot(self.country_2_coordinates)
+        #self.kde_plot(self.country_1_coordinates)
+        self.region_viz(self.cntr_id_country[0], self.country_1_coordinates)
         print("Visualization done...")
 
 
@@ -40,6 +45,12 @@ class KdeDataHandler():
         country_pair2 = f"{countries[1]}_{countries[0]}" #avoiding error in case of wrong order
 
         return country_pair1, country_pair2
+
+    def __get_cntr_id(self, countries):
+        country1 = countries[0]
+        country2 = countries[1]
+
+        return country1, country2
 
     def __create_df_of_cntr_od(self, cntr_od_tuple):
 
@@ -92,7 +103,7 @@ class KdeDataHandler():
         return country_gdf
     
     def kde_plot(self, country):
-
+        print(country.crs)
         # Create a figure and axes for the plot
         fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -113,13 +124,18 @@ class KdeDataHandler():
         ax.set_xlim(extent[0], extent[2])
         ax.set_ylim(extent[1], extent[3])
 
-        ctx.add_basemap(ax = ax,  crs = country.crs.to_string(), source=ctx.providers.OpenStreetMap.Mapnik, zoom=19)
+        contextily.add_basemap(ax, source=contextily.providers.OpenStreetMap.Mapnik, zoom = 12)
+
+        #contextily.add_basemap(ax = ax,  crs = country.crs.to_string(), source=ctx.providers.OpenStreetMap.Mapnik, zoom=19)
 
         ax.set_xlabel('Longitude')
         ax.set_ylabel('Latitude')
         ax.set_title('Kernel Density Plot of Mobility Data')
 
         plt.show()
+
+        return self.kernel
+
 
     def contour_intervalls(self, number_of_intervalls):
         first_intervall_value = 0.05
@@ -132,8 +148,35 @@ class KdeDataHandler():
             value += intervall
             levels_list.append(value)
         return levels_list
+    
+    def read_gpkg_file(self):
+
+
+        self.border_data = gpd.read_file('GRL_region.gpkg')
+
+        self.border_data = self.border_data.to_crs(epsg = 3857)
+        print(self.border_data.crs)
+    
+    def region_viz(self, country1, country):
+        
+        self.selected_regions = self.border_data.loc[self.border_data['FIPS'].isin([country1])]
+
+        ax = self.selected_regions.plot(figsize=(10, 8), alpha = 0.5, facecolor = 'white', edgecolor = 'black')
+
+        #extent = self.selected_regions.total_bounds
+        #regions_points = country.geometry.cx[extent[0]:extent[2], extent[1]:extent[3]]   
+        
+        #ax.set_xlim(extent[0], extent[2])
+        #ax.set_ylim(extent[1], extent[3])
+
+        contextily.add_basemap(ax, crs = 'EPSG:3857')
+        #ax.set_axis_off()
+
+        plt.show()
 
         
+
+
 
 
 
