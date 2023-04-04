@@ -155,14 +155,12 @@ class KdeDataHandler():
         self.border_data = gpd.read_file('GRL_region.gpkg')
 
         self.border_data = self.border_data.to_crs(epsg = 3857)
-        print(self.border_data.crs)
     
     def region_viz(self, country1, country):
         
         self.selected_regions = self.border_data.loc[self.border_data['FIPS'].isin([country1])]
 
         ax = self.selected_regions.plot(figsize=(10, 8), alpha = 0.5, facecolor = 'white', edgecolor = 'black')
-
         #extent = self.selected_regions.total_bounds
         #regions_points = country.geometry.cx[extent[0]:extent[2], extent[1]:extent[3]]   
         
