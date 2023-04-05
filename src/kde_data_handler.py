@@ -29,11 +29,12 @@ class KdeDataHandler():
 
     def visualize(self):
         print("Visualization starting...")
+        #print(self.country_1_coordinates.head())
         #self.kde_plot(self.country_1_coordinates)
         self.region_viz(self.cntr_id_country[0], self.country_1_coordinates)
         print("Visualization done...")
 
-
+    # Reading in the csv file
     def __csv_to_df(self):
         
         return pd.read_csv('mobility_data.csv', sep = ',')
@@ -70,8 +71,10 @@ class KdeDataHandler():
         gdf = gpd.GeoDataFrame(
         self.country_pair_df, geometry = gpd.points_from_xy(lon, lat))
 
+        print(f'This is gdf crs before setting a new: {gdf.crs}')
         gdf = gdf.set_crs(epsg=3857)
         gdf = gdf.to_crs(3857)
+        print(f'This is gdf crs after setting a new: {gdf.crs}')
 
 
         return gdf
@@ -103,9 +106,9 @@ class KdeDataHandler():
         return country_gdf
     
     def kde_plot(self, country):
-        print(country.crs)
+
         # Create a figure and axes for the plot
-        fig, ax = plt.subplots(figsize=(10, 8))
+        fig, ax = plt.subplots(figsize=(12, 8))
 
         # Plot the kernel density estimate of start locations as a contour plot
         sns.kdeplot(
@@ -124,17 +127,14 @@ class KdeDataHandler():
         ax.set_xlim(extent[0], extent[2])
         ax.set_ylim(extent[1], extent[3])
 
-        contextily.add_basemap(ax, source=contextily.providers.OpenStreetMap.Mapnik, zoom = 12)
-
-        #contextily.add_basemap(ax = ax,  crs = country.crs.to_string(), source=ctx.providers.OpenStreetMap.Mapnik, zoom=19)
 
         ax.set_xlabel('Longitude')
         ax.set_ylabel('Latitude')
         ax.set_title('Kernel Density Plot of Mobility Data')
 
-        plt.show()
+        #contextily.add_basemap(ax, crs = 'EPSG:4326')
 
-        return self.kernel
+        plt.show()
 
 
     def contour_intervalls(self, number_of_intervalls):
@@ -154,24 +154,45 @@ class KdeDataHandler():
 
         self.border_data = gpd.read_file('GRL_region.gpkg')
 
-        self.border_data = self.border_data.to_crs(epsg = 3857)
+        self.border_data = self.border_data.to_crs(epsg = 4326)
     
     def region_viz(self, country1, country):
         
         self.selected_regions = self.border_data.loc[self.border_data['FIPS'].isin([country1])]
 
         ax = self.selected_regions.plot(figsize=(10, 8), alpha = 0.5, facecolor = 'white', edgecolor = 'black')
+
+        print(f'This is the printout of selected regions crs: {self.selected_regions.crs}')
+        print(f' This is the printout of country crs: {country.crs}')
+
+        print(self.selected_regions.head())
+        print(country.head())
+
+        sns.kdeplot(
+            x = country.geometry.x,
+            y = country.geometry.y,
+            cmap = 'viridis',
+            fill = True,
+            alpha = 0.5,
+            ax = ax,
+            levels = self.contour_intervalls(4)
+        )
+
+
+        contextily.add_basemap(ax, crs = 'EPSG:4326')
+
+        plt.show()
+
+
+
         #extent = self.selected_regions.total_bounds
         #regions_points = country.geometry.cx[extent[0]:extent[2], extent[1]:extent[3]]   
         
         #ax.set_xlim(extent[0], extent[2])
         #ax.set_ylim(extent[1], extent[3])
 
-        contextily.add_basemap(ax, crs = 'EPSG:3857')
+        #contextily.add_basemap(ax, crs = 'EPSG:3857')
         #ax.set_axis_off()
-
-        plt.show()
-
         
 
 
