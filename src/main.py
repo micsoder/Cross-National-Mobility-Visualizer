@@ -1,4 +1,5 @@
 from kde_data_handler import KdeDataHandler
+from country_codes import iso_country_codes
 
 class Main():
 
@@ -15,11 +16,13 @@ class Main():
 
             if value is False:
                 print(f'Command "{command}" not recognized')
+                print(' ')
                 continue
             
             break
 
         print(f"Command {command} accepted")
+        print(' ')
         self.second_question()
 
     def second_question(self):
@@ -30,11 +33,13 @@ class Main():
 
             if value is False:
                 print(f'Second command "{command}" not recognized')
+                print(' ')
                 continue
 
             break
                 
         print(f"Command {command} accepted")
+        print(' ')
         self.analysis_question()
 
     def analysis_question(self):
@@ -45,6 +50,7 @@ class Main():
 
             if value is False:
                 print(f'Analysis "{command}" not recognized')
+                print(' ')
                 continue
             break
 
@@ -58,6 +64,7 @@ class Main():
 
             if value is False:
                 print(f'Program not started')
+                print(' ')
                 continue
             break
 
@@ -67,7 +74,7 @@ class Main():
         if command == "exit":
             return False
 
-        if command == 'FR':
+        if command in iso_country_codes:
             self.input_packager.add_country(command)
             return True
         
@@ -79,7 +86,7 @@ class Main():
         if command == 'exit':
             return False
 
-        if command == 'LU':
+        if command in iso_country_codes:
             self.input_packager.add_country(command)
             return True
 

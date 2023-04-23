@@ -22,11 +22,14 @@ class Ui():
         print("What do you want to do?")
         print("The available options are:")
         print("Kernel Density Estimation plotting (KDE)")
+        print(' ')
 
         command = input("Analysis: ")
+        print(' ')
         return command
     
     def start_program(self):
         
         command = input('Do you want to start the program (yes): ')
+        print(' ')
         return command
