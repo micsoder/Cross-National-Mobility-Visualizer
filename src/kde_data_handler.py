@@ -11,6 +11,8 @@ from shapely.geometry import box
 from descartes import PolygonPatch
 from shapely.geometry import MultiPolygon
 from scipy.interpolate import griddata
+from scipy.spatial import distance
+import math
 #from matplotlib.patches import Polygon as PolygonPatch
 
 
@@ -33,6 +35,8 @@ class KdeDataHandler():
         self.country_2_coordinates = self.__country_coords_gdf(self.countries[1])
         self.gpkg_file = self.read_gpkg_file()
         #self.calculated_xy = self.min_max_xy_calculation()
+        self.country_1_bandwidth = self.calculate_bandwidth(self.country_1_coordinates)
+        self.country_2_bandwidth = self.calculate_bandwidth(self.country_2_coordinates)
         print("Data processing done...")
         print(' ')
 
@@ -40,7 +44,7 @@ class KdeDataHandler():
     def visualize(self):
         print("Visualization starting...")
         print(' ')
-        self.region_viz(self.cntr_id_country[0], self.country_1_coordinates)
+        #self.region_viz(self.cntr_id_country[0], self.country_1_coordinates)
         #self.kde_to_gpkg(self.country_1_coordinates)
         print(' ')
         print('Visualization done.')
@@ -145,6 +149,51 @@ class KdeDataHandler():
 
         print(min_max_xy_df.head())
         min_max_xy_df.to_csv('calculated_bounds.csv', sep=',', index = False)
+    
+
+    def calculate_bandwidth(self, country): 
+
+        # Calculate the count of all points
+        self.N = len(country)
+
+        # Calculate the mean center (centroid) of all input points
+        centroid = country.geometry.centroid
+        MeanCenter = (centroid.x.mean(), centroid.y.mean())
+            
+        # Calculate the distance from the Mean Center for all points
+        DistMC = country.distance(gpd.points_from_xy([MeanCenter[0]], [MeanCenter[1]])[0])
+        
+        # Calculate the median of these distances (DistMC)
+        self.Dm = np.median(DistMC)
+
+        # Calculate the sum of squared deviations
+        sq_dev = np.sum((DistMC - self.Dm) ** 2)
+
+        # Calculate the Standard Distance
+        self.SD = np.sqrt(sq_dev / (self.N - 1))
+        
+        # Calculate the Standard Distance of these distances (DistMC)
+        #self.std = np.std(DistMC)
+
+        print(f'The number of points: {self.N}')
+        print(f'The median of distance: {self.Dm}')
+        print(f'The Standard Distance: {self.SD}')
+        #print(f'Std: {self.std}')
+
+        self.calculate_the_exact_bandwidth(self.Dm, self.SD, self.N, country)
+    
+    def calculate_the_exact_bandwidth(self, Dm, SD, N, country):
+
+        country_name = country.iloc[0]['country_name']
+
+        ln2 = math.log(2)
+        min_value = min(SD, math.sqrt(1/ln2 * Dm))
+        search_radius = 0.7 * min_value * N **(-0.4)
+        print(f'country: {country_name}, search radius : {search_radius}')
+
+
+
+
 
     def contour_intervalls(self, number_of_intervalls):
         first_intervall_value = 0.05
@@ -195,7 +244,7 @@ class KdeDataHandler():
             fill = True,
             alpha = 0.5,
             ax = ax,
-            bw_adjust = 1,
+            bw_adjust = 6,
             levels = self.contour_intervalls(4)
         )
 

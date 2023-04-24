@@ -8,6 +8,5 @@ def index():
     app = Main(ui, input_packager)
     app.start()
 
-
 if __name__=="__main__":
     index()
