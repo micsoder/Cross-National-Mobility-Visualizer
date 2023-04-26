@@ -33,10 +33,12 @@ class KdeDataHandler():
         self.country_pair_gdf = self.__create_country_pair_gdf()
         self.country_1_coordinates = self.__country_coords_gdf(self.countries[0])
         self.country_2_coordinates = self.__country_coords_gdf(self.countries[1])
-        self.gpkg_file = self.read_gpkg_file()
+
+
+        self.gpkg_file = self.read_gpkg_file(self.cntr_id_country[0])
         #self.calculated_xy = self.min_max_xy_calculation()
-        self.country_1_bandwidth = self.calculate_bandwidth(self.country_1_coordinates)
-        self.country_2_bandwidth = self.calculate_bandwidth(self.country_2_coordinates)
+        #self.search_radius = self.bandwidth_calculation_initialized()
+        self.kde_clip = self.read_geo_file()
         print("Data processing done...")
         print(' ')
 
@@ -45,7 +47,7 @@ class KdeDataHandler():
         print("Visualization starting...")
         print(' ')
         #self.region_viz(self.cntr_id_country[0], self.country_1_coordinates)
-        #self.kde_to_gpkg(self.country_1_coordinates)
+        #self.kde_to_gpkg(self.country_2_coordinates)
         print(' ')
         print('Visualization done.')
 
@@ -78,6 +80,7 @@ class KdeDataHandler():
     def __create_df_of_cntr_od(self):
 
         return self.df.loc[self.df['CNTR_OD'].isin([self.cntr_od])]
+    
         
     def __create_country_pair_gdf(self):
 
@@ -110,6 +113,7 @@ class KdeDataHandler():
         filtered_start_gdf = self.country_pair_gdf.loc[self.country_pair_gdf['CNTR_ID_start'].isin([country])]
         filtered_end_gdf = self.country_pair_gdf.loc[self.country_pair_gdf['CNTR_ID_end'].isin([country])]
 
+
         if not filtered_start_gdf.empty:
             filtered_start_gdf = filtered_start_gdf.drop(columns=['geometry_of_end'])
             filtered_start_gdf = filtered_start_gdf.rename(columns={'geometry_of_start': 'geometry'})
@@ -123,7 +127,7 @@ class KdeDataHandler():
         country_id = str(country)
 
         country_gdf['country_name'] = country_id
-
+        
         country_gdf = country_gdf.reset_index(drop=True)
         return country_gdf
     
@@ -146,12 +150,20 @@ class KdeDataHandler():
         y_max = country_bounds['maxy'].max()
 
         min_max_xy_df.loc[len(min_max_xy_df)] = [self.cntr_od, country_name, x_min, x_max, y_min, y_max]
+        
 
         print(min_max_xy_df.head())
         min_max_xy_df.to_csv('calculated_bounds.csv', sep=',', index = False)
-    
 
-    def calculate_bandwidth(self, country): 
+    
+    def bandwidth_calculation_initialized(self):
+
+        bandwidth_df = pd.DataFrame(columns=['country_pair', 'country', 'N', 'Dm', 'SD', 'search_radius'])
+
+        self.calculate_bandwidth(self.country_1_coordinates, bandwidth_df)
+        self.calculate_bandwidth(self.country_2_coordinates, bandwidth_df)
+
+    def calculate_bandwidth(self, country, bandwidth_df): 
 
         # Calculate the count of all points
         self.N = len(country)
@@ -172,26 +184,26 @@ class KdeDataHandler():
         # Calculate the Standard Distance
         self.SD = np.sqrt(sq_dev / (self.N - 1))
         
-        # Calculate the Standard Distance of these distances (DistMC)
-        #self.std = np.std(DistMC)
 
         print(f'The number of points: {self.N}')
         print(f'The median of distance: {self.Dm}')
         print(f'The Standard Distance: {self.SD}')
-        #print(f'Std: {self.std}')
 
-        self.calculate_the_exact_bandwidth(self.Dm, self.SD, self.N, country)
+        self.calculate_the_exact_bandwidth(self.Dm, self.SD, self.N, country, bandwidth_df)
     
-    def calculate_the_exact_bandwidth(self, Dm, SD, N, country):
+    def calculate_the_exact_bandwidth(self, Dm, SD, N, country, bandwidth_df):
 
         country_name = country.iloc[0]['country_name']
 
         ln2 = math.log(2)
         min_value = min(SD, math.sqrt(1/ln2 * Dm))
-        search_radius = 0.7 * min_value * N **(-0.4)
+        search_radius = 0.9 * min_value * N **(-0.2)
         print(f'country: {country_name}, search radius : {search_radius}')
 
+        bandwidth_df.loc[len(bandwidth_df)] = [self.cntr_od, country_name, N, Dm, SD, search_radius]
 
+        print(bandwidth_df.head())
+        bandwidth_df.to_csv('calculated_search_radius.csv', sep=',', index = False)
 
 
 
@@ -207,16 +219,25 @@ class KdeDataHandler():
             levels_list.append(value)
         return levels_list
     
-    def read_gpkg_file(self):
+    
+    def read_gpkg_file(self, country1_abb):
 
         #self.border_data = gpd.read_file('GRL_region.gpkg')
         self.border_data = gpd.read_file('cropped_greatLux.gpkg')
 
         self.border_data = self.border_data.to_crs(epsg = 3035)
 
+        self.selected_regions = self.border_data.loc[self.border_data['FIPS'].isin([country1_abb])]
+
+        self.selected_regions = self.selected_regions.reset_index(drop=True)
+
 
     def region_viz(self, country1_abb, country):
+    
 
+        levels = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1]
+
+        
         if country1_abb == 'DE':
             self.selected_regions = self.border_data.loc[self.border_data['FIPS'].isin(['GM'])]
         else: 
@@ -235,22 +256,22 @@ class KdeDataHandler():
         print('Country head:')
         print(country.head())
 
-        country_clipped = country.clip(self.selected_regions)
+        #country_clipped = country.clip(self.selected_regions)
 
         self.kde = sns.kdeplot(
-            x = country_clipped.geometry.x,
-            y = country_clipped.geometry.y,
+            x = country.geometry.x,
+            y = country.geometry.y,
             cmap = 'viridis',
             fill = True,
-            alpha = 0.5,
             ax = ax,
-            bw_adjust = 6,
-            levels = self.contour_intervalls(4)
+            alpha = 0.5,
+            levels = levels
         )
 
         ax.set_xlim(self.selected_regions.total_bounds[0], self.selected_regions.total_bounds[2])
         ax.set_ylim(self.selected_regions.total_bounds[1], self.selected_regions.total_bounds[3])
 
+        self.kde = self.kde.clip(self.selected_regions)
 
         contextily.add_basemap(ax, crs = 'EPSG:3035')
 
@@ -258,7 +279,7 @@ class KdeDataHandler():
 
 
     def kde_to_gpkg(self, country):
-
+        #fix the levels 
         levels = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1]
 
         level_polygons = []
@@ -298,7 +319,52 @@ class KdeDataHandler():
         # Calculate area
         gdf_of_polygons['area'] = gdf_of_polygons['geometry'].area
         # Save to file
-        gdf_of_polygons.to_file('geo_file_TEST.gpkg', driver='GPKG')
+        gdf_of_polygons.to_file('geo_file.gpkg', driver='GPKG')
+
+    def read_geo_file(self):
+
+        kde_vector_layer = gpd.read_file('geo_file_FRANCE_LU.gpkg')
+        print(kde_vector_layer.head())
+
+
+# Get the intersection of the kde_vector_layer with the selected_regions
+        clipped_layer = gpd.overlay(kde_vector_layer, self.selected_regions, how='intersection')
+
+
+        # Plot the clipped layer using the plot() method
+        fig, ax = plt.subplots()
+        clipped_layer.plot(ax=ax)
+
+        # Plot the polygon on top of the clipped layer to show the clipping extent
+        self.selected_regions.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=2)
+
+        # Set the axis limits to the extent of the polygon
+        #ax.set_xlim(xmin, xmax)
+        #ax.set_ylim(ymin, ymax)
+
+        # Show the plot
+        plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
