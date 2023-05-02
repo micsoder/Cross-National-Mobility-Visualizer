@@ -35,10 +35,8 @@ class KdeDataHandler():
         self.country_2_coordinates = self.__country_coords_gdf(self.countries[1])
 
 
-        self.gpkg_file = self.read_gpkg_file(self.cntr_id_country[0])
-        #self.calculated_xy = self.min_max_xy_calculation()
+        self.gpkg_file = self.read_gpkg_file()
         #self.search_radius = self.bandwidth_calculation_initialized()
-        self.kde_clip = self.read_geo_file()
         print("Data processing done...")
         print(' ')
 
@@ -46,8 +44,7 @@ class KdeDataHandler():
     def visualize(self):
         print("Visualization starting...")
         print(' ')
-        #self.region_viz(self.cntr_id_country[0], self.country_1_coordinates)
-        #self.kde_to_gpkg(self.country_2_coordinates)
+        self.kde_plot_initializing()
         print(' ')
         print('Visualization done.')
 
@@ -130,30 +127,6 @@ class KdeDataHandler():
         
         country_gdf = country_gdf.reset_index(drop=True)
         return country_gdf
-    
-    def min_max_xy_calculation(self):
-
-        min_max_xy_df = pd.DataFrame(columns=['country_pair','country', 'x_min', 'x_max', 'y_min', 'y_max'])
-
-        self.calculate_xy(self.country_1_coordinates, min_max_xy_df)
-        self.calculate_xy(self.country_2_coordinates, min_max_xy_df)
-
-    def calculate_xy(self, country, min_max_xy_df):
-
-        country_name = country.iloc[0]['country_name']
-
-        country_bounds = country.bounds
-
-        x_min = country_bounds['minx'].min()
-        x_max = country_bounds['maxx'].max()
-        y_min = country_bounds['miny'].min()
-        y_max = country_bounds['maxy'].max()
-
-        min_max_xy_df.loc[len(min_max_xy_df)] = [self.cntr_od, country_name, x_min, x_max, y_min, y_max]
-        
-
-        print(min_max_xy_df.head())
-        min_max_xy_df.to_csv('calculated_bounds.csv', sep=',', index = False)
 
     
     def bandwidth_calculation_initialized(self):
@@ -206,7 +179,6 @@ class KdeDataHandler():
         bandwidth_df.to_csv('calculated_search_radius.csv', sep=',', index = False)
 
 
-
     def contour_intervalls(self, number_of_intervalls):
         first_intervall_value = 0.05
         actual_intervalls = number_of_intervalls - 1
@@ -218,73 +190,67 @@ class KdeDataHandler():
             value += intervall
             levels_list.append(value)
         return levels_list
-    
-    
-    def read_gpkg_file(self, country1_abb):
+
+
+    def read_gpkg_file(self):
 
         #self.border_data = gpd.read_file('GRL_region.gpkg')
         self.border_data = gpd.read_file('cropped_greatLux.gpkg')
 
         self.border_data = self.border_data.to_crs(epsg = 3035)
 
-        self.selected_regions = self.border_data.loc[self.border_data['FIPS'].isin([country1_abb])]
-
-        self.selected_regions = self.selected_regions.reset_index(drop=True)
 
 
-    def region_viz(self, country1_abb, country):
-    
+    def kde_plot_initializing(self):
+
+        #firt country
+        self.kde1 = self.kde_plot(self.country_1_coordinates, 0.5 )
+        print("KDE plot done")
+        self.country_1_file_name = self.kde_to_gpkg(self.kde1, self.country_1_coordinates)
+        print("KDE plot saved as gpkg")
+        self.selected_regions_1 = self.select_region(self.country_1_coordinates)
+        print("Region selected")
+        self.country_1_plot = self.read_geo_file(self.country_1_coordinates, self.country_1_file_name, self.selected_regions_1)
+        print("Clipped plot saved")
+
+        #second country
+        self.kde2 = self.kde_plot(self.country_2_coordinates, 1.9)
+        print("KDE plot done")
+        self.country_2_file_name = self.kde_to_gpkg(self.kde2, self.country_2_coordinates)
+        print("KDE plot saved as gpkg")
+        self.selected_regions_2 = self.select_region(self.country_2_coordinates)
+        print("Region selected")
+        self.country_2_plot = self.read_geo_file(self.country_2_coordinates, self.country_2_file_name, self.selected_regions_2)
+        print("Clipped plot saved")
+
+
+        #Merging of country 1 and country 2
+        self.merge_clipped_layer(self.country_1_plot, self.country_2_plot, self.selected_regions_1, self.selected_regions_2)
+
+
+    def kde_plot(self, country, bw):
 
         levels = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1]
-
-        
-        if country1_abb == 'DE':
-            self.selected_regions = self.border_data.loc[self.border_data['FIPS'].isin(['GM'])]
-        else: 
-            self.selected_regions = self.border_data.loc[self.border_data['FIPS'].isin([country1_abb])]
-
-        self.selected_regions = self.selected_regions.reset_index(drop=True)
-
-        ax = self.selected_regions.plot(figsize=(10, 8), alpha = 0.5, facecolor = 'white', edgecolor = 'black')
-
-        print(f'Selected regions crs: {self.selected_regions.crs}')
-        print(f'Country crs: {country.crs}')
-        print(' ')
-        print('Selected regions head:')
-        print(self.selected_regions.head())
-        print(' ')
-        print('Country head:')
-        print(country.head())
-
-        #country_clipped = country.clip(self.selected_regions)
 
         self.kde = sns.kdeplot(
             x = country.geometry.x,
             y = country.geometry.y,
             cmap = 'viridis',
             fill = True,
-            ax = ax,
             alpha = 0.5,
+            bw_adjust = bw,
             levels = levels
         )
 
-        ax.set_xlim(self.selected_regions.total_bounds[0], self.selected_regions.total_bounds[2])
-        ax.set_ylim(self.selected_regions.total_bounds[1], self.selected_regions.total_bounds[3])
+        return self.kde
 
-        self.kde = self.kde.clip(self.selected_regions)
-
-        contextily.add_basemap(ax, crs = 'EPSG:3035')
-
-        plt.show()
-
-
-    def kde_to_gpkg(self, country):
+    def kde_to_gpkg(self, kde, country):
         #fix the levels 
         levels = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1]
 
         level_polygons = []
         i = 0
-        for col in self.kde.collections:
+        for col in kde.collections:
             paths = []
             # Loop through all polygons that have the same intensity level
             for contour in col.get_paths(): 
@@ -318,17 +284,44 @@ class KdeDataHandler():
         print(gdf_of_polygons.crs)
         # Calculate area
         gdf_of_polygons['area'] = gdf_of_polygons['geometry'].area
+        #file name 
+        country_id= country.iloc[0]['country_name']
+        print(country_id)
+        file_name = f'{country_id}_geo_file.gpkg'
+        print(file_name)
+
         # Save to file
-        gdf_of_polygons.to_file('geo_file.gpkg', driver='GPKG')
+        gdf_of_polygons.to_file(file_name, driver='GPKG')
+        return file_name
 
-    def read_geo_file(self):
 
-        kde_vector_layer = gpd.read_file('geo_file_FRANCE_LU.gpkg')
+
+    def select_region(self, country):
+
+        country_abb = country.iloc[0]['country_name']
+
+        self.selected_regions = self.border_data.loc[self.border_data['FIPS'].isin([country_abb])]
+
+        self.selected_regions = self.selected_regions.reset_index(drop=True)
+
+        self.selected_regions.set_crs(3035)
+        self.selected_regions.to_crs(epsg = 3035)
+
+        print("printing out the selected regions head")
+        print(self.selected_regions.head())
+
+        return self.selected_regions
+
+
+    def read_geo_file(self, country, filename, region):
+
+        kde_vector_layer = gpd.read_file(filename)
+        print("currently printing out the kde vector layer head")
         print(kde_vector_layer.head())
 
 
-# Get the intersection of the kde_vector_layer with the selected_regions
-        clipped_layer = gpd.overlay(kde_vector_layer, self.selected_regions, how='intersection')
+        # Get the intersection of the kde_vector_layer with the selected_regions
+        clipped_layer = gpd.overlay(kde_vector_layer, region, how='intersection')
 
 
         # Plot the clipped layer using the plot() method
@@ -336,157 +329,38 @@ class KdeDataHandler():
         clipped_layer.plot(ax=ax)
 
         # Plot the polygon on top of the clipped layer to show the clipping extent
-        self.selected_regions.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=2)
+        region.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=2)
 
         # Set the axis limits to the extent of the polygon
         #ax.set_xlim(xmin, xmax)
         #ax.set_ylim(ymin, ymax)
+        #contextily.add_basemap(ax, crs = 'EPSG:3035')
 
         # Show the plot
         plt.show()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        return clipped_layer
     
-    def first_region_viz(self, country1, country):
-        
-        #self.selected_regions = self.border_data.loc[self.border_data['FIPS'].isin([country1])]
-        #self.lorraine = self.border_data.loc[self.border_data['OriginUnit'].isin(['Lorraine'])]
-        #self.selected_regions = self.selected_regions.explode(ignore_index=True)
-        #exploded = self.selected_regions.explode(ignore_index=True)
-        #mask = MultiPolygon(self.selected_regions.geometry.values).buffer(0)
-        levels1 = [0.2,0.4,0.6,0.8,1]
-        levels = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1]
+
+    def merge_clipped_layer(self, clipped_layer1, clipped_layer2, region1, region2):
+
+        merged_layers = pd.concat([clipped_layer1, clipped_layer2], ignore_index = True)
 
 
-        f, ax = plt.subplots(ncols=1, figsize=(20, 8))
+        ax = merged_layers.plot(figsize=(10, 10), alpha=0.5, edgecolor='k')
 
-        #ax = self.selected_regions.plot(figsize=(10, 8), alpha = 0.5, facecolor = 'white', edgecolor = 'black')
-        #ax = self.lorraine.plot(figsize = (10, 8), alpha = 0.5, facecolor = 'white', edgecolor = 'black')
-
-
-        #print(f'This is the printout of selected regions crs: {self.selected_regions.crs}')
-        print(f' This is the printout of country crs: {country.crs}')
-        #print(self.selected_regions.head())
-        #print(self.lorraine.head())
-        #print(country.head())
-
-        #print(self.selected_regions.geom_type)
-        #print("Creating Clipped...")
-
-        #clipped = self.lorraine['geometry']   
-        #p = PolygonPatch(clipped.all(),transform=ax.transData)
-        #ax.set_clip_path(p)
-
-        #ax.set_xlim(self.lorraine.total_bounds[0], self.lorraine.total_bounds[2])
-        #ax.set_ylim(self.lorraine.total_bounds[1], self.lorraine.total_bounds[3])
-
-        print("")
-        print("Clipped created...")
+        region1.plot(ax=ax, alpha = 0.5, facecolor = 'white', edgecolor = 'black')
+        region2.plot(ax=ax, alpha = 0.5, facecolor = 'white', edgecolor = 'black')
 
 
-        print("testing geom..")
-        
-        kde = sns.kdeplot(
-            x = country.geometry.x,
-            y = country.geometry.y,
-            cmap = 'viridis',
-            fill = True,
-            alpha = 0.5,
-            bw_adjust = 3,
-            levels = levels
-        )
-
-        # Convert the selected regions to a MultiPolygon
-        #polygon = MultiPolygon(list(self.selected_regions['geometry']))
-
-        # Create a polygon patch from the MultiPolygon
-        #p = PolygonPatch(polygon, transform=ax.transData)
-
-        # Set the clip path to the polygon patch
-        #ax.set_clip_path(p)
-
-        #clip_path = mpath.Path(self.selected_regions.geometry.iloc[0].exterior.coords)
-        #ax.set_clip_path(clip_path)       
-
-        #p = PolygonPatch(self.selected_regions['geometry'].iloc[0],transform=ax.transData)
-        #ax.set_clip_path(p)
-
-        #ax.set_xlim(self.selected_regions.total_bounds[0], self.selected_regions.total_bounds[2])
-        #ax.set_ylim(self.selected_regions.total_bounds[1], self.selected_regions.total_bounds[3])
-
-        #contextily.add_basemap(ax, crs = 'EPSG:4326')
-
+        # Show the plot
+        contextily.add_basemap(ax, crs = 'EPSG:3035')
         plt.show()
 
-        level_polygons = []
-        i = 0
-        for col in kde.collections:
-            paths = []
-            # Loop through all polygons that have the same intensity level
-            for contour in col.get_paths(): 
-                # Create a polygon for the countour
-                # First polygon is the main countour, the rest are holes
-                for ncp,cp in enumerate(contour.to_polygons()):
-                    x = cp[:,0]
-                    y = cp[:,1]
-                    new_shape = Polygon([(i[0], i[1]) for i in zip(x,y)])
-                    if ncp == 0:
-                        poly = new_shape
-                    else:
-                        # Remove holes, if any
-                        poly = poly.difference(new_shape)
-
-                # Append polygon to list
-                paths.append(poly)
-            # Create a MultiPolygon for the contour
-            multi = MultiPolygon(paths)
-            # Append MultiPolygon and level as tuple to list
-            level_polygons.append((levels[i], multi))
-            i+=1
-
-        # Create DataFrame
-        df = pd.DataFrame(level_polygons, columns =['level', 'geometry'])
-        # Convert to a GeoDataFrame
-        geo = gpd.GeoDataFrame(df, geometry='geometry', crs = country.crs)
-        print(geo.crs)
-        # Set CRS for geometric operations
-        geo = geo.to_crs(epsg=3035)
-        print(geo.crs)
-        # Calculate area
-        geo['area'] = geo['geometry'].area
-        # Save to file
-        geo.to_file('geo_file_TESTING.gpkg', driver='GPKG')
+        
+        # Save the merged GeoDataFrame to a .gpkg file
+        merged_layers.to_file('countries_merged.gpkg', driver='GPKG')
 
 
 
-    
+
