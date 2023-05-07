@@ -51,7 +51,7 @@ class KdeDataHandler():
     # Reading in the csv file
     def __csv_to_df(self):
         
-        return pd.read_csv('mobility_data.csv', sep = ',')
+        return pd.read_csv('full_mobility_dataset.csv', sep = ',')
         
     def __get_cntr_id(self, countries):
         country1 = countries[0]
@@ -81,8 +81,8 @@ class KdeDataHandler():
         
     def __create_country_pair_gdf(self):
 
-        gdf_start = self.__df_to_gdf(self.country_pair_df.h3_grid_res10_start_lon, self.country_pair_df.h3_grid_res10_start_lat)
-        gdf_end = self.__df_to_gdf(self.country_pair_df.h3_grid_res10_end_lon, self.country_pair_df.h3_grid_res10_end_lat)
+        gdf_start = self.__df_to_gdf(self.country_pair_df.start_lon, self.country_pair_df.start_lat)
+        gdf_end = self.__df_to_gdf(self.country_pair_df.end_lon, self.country_pair_df.end_lat)
 
         country_pair_gdf = self.__combine_gdfs(gdf_start, gdf_end)
 
@@ -195,16 +195,20 @@ class KdeDataHandler():
     def read_gpkg_file(self):
 
         #self.border_data = gpd.read_file('GRL_region.gpkg')
-        self.border_data = gpd.read_file('cropped_greatLux.gpkg')
+        self.border_data = gpd.read_file('NUTS_test.gpkg')
+        #self.border_data = gpd.read_file('cropped_greatLux.gpkg')
 
         self.border_data = self.border_data.to_crs(epsg = 3035)
+        print("border data printed")
+        print(self.border_data.head())
+        print(self.border_data.crs)
 
 
 
     def kde_plot_initializing(self):
 
         #firt country
-        self.kde1 = self.kde_plot(self.country_1_coordinates, 0.5 )
+        self.kde1 = self.kde_plot(self.country_1_coordinates, 0.4)
         print("KDE plot done")
         self.country_1_file_name = self.kde_to_gpkg(self.kde1, self.country_1_coordinates)
         print("KDE plot saved as gpkg")
@@ -214,7 +218,7 @@ class KdeDataHandler():
         print("Clipped plot saved")
 
         #second country
-        self.kde2 = self.kde_plot(self.country_2_coordinates, 1.9)
+        self.kde2 = self.kde_plot(self.country_2_coordinates, 1.7)
         print("KDE plot done")
         self.country_2_file_name = self.kde_to_gpkg(self.kde2, self.country_2_coordinates)
         print("KDE plot saved as gpkg")
@@ -300,7 +304,11 @@ class KdeDataHandler():
 
         country_abb = country.iloc[0]['country_name']
 
-        self.selected_regions = self.border_data.loc[self.border_data['FIPS'].isin([country_abb])]
+        if country_abb == 'DE':
+            self.selected_regions = self.border_data.loc[self.border_data['CNTR_CODE'].isin(['GM'])]
+
+        else:
+            self.selected_regions = self.border_data.loc[self.border_data['CNTR_CODE'].isin([country_abb])]
 
         self.selected_regions = self.selected_regions.reset_index(drop=True)
 
@@ -331,9 +339,6 @@ class KdeDataHandler():
         # Plot the polygon on top of the clipped layer to show the clipping extent
         region.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=2)
 
-        # Set the axis limits to the extent of the polygon
-        #ax.set_xlim(xmin, xmax)
-        #ax.set_ylim(ymin, ymax)
         #contextily.add_basemap(ax, crs = 'EPSG:3035')
 
         # Show the plot
@@ -359,7 +364,7 @@ class KdeDataHandler():
 
         
         # Save the merged GeoDataFrame to a .gpkg file
-        merged_layers.to_file('countries_merged.gpkg', driver='GPKG')
+        merged_layers.to_file('countries_merged_ES_PT.gpkg', driver='GPKG')
 
 
 
