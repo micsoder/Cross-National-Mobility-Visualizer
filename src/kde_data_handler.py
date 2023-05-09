@@ -36,6 +36,8 @@ class KdeDataHandler():
 
 
         self.gpkg_file = self.read_gpkg_file()
+        self.interreg_file = self.importing_interreg()
+        print('Search radius calculation started')
         #self.search_radius = self.bandwidth_calculation_initialized()
         print("Data processing done...")
         print(' ')
@@ -44,14 +46,16 @@ class KdeDataHandler():
     def visualize(self):
         print("Visualization starting...")
         print(' ')
-        self.kde_plot_initializing()
+        #self.kde_plot_initializing_for_interreg()
+        #self.kde_plot_initializing_for_entire_dataset()
         print(' ')
         print('Visualization done.')
 
     # Reading in the csv file
     def __csv_to_df(self):
         
-        return pd.read_csv('full_mobility_dataset.csv', sep = ',')
+        #return pd.read_csv('full_mobility_dataset.csv', sep = ',')
+        return pd.read_csv('full_mobility_dataset_without_int.csv', sep = ',')
         
     def __get_cntr_id(self, countries):
         country1 = countries[0]
@@ -133,8 +137,11 @@ class KdeDataHandler():
 
         bandwidth_df = pd.DataFrame(columns=['country_pair', 'country', 'N', 'Dm', 'SD', 'search_radius'])
 
-        self.calculate_bandwidth(self.country_1_coordinates, bandwidth_df)
-        self.calculate_bandwidth(self.country_2_coordinates, bandwidth_df)
+        #self.calculate_bandwidth(self.country_1_coordinates, bandwidth_df)
+        #self.calculate_bandwidth(self.country_2_coordinates, bandwidth_df)
+
+        self.calculate_bandwidth(self.country_1_dataset, bandwidth_df)
+        self.calculate_bandwidth(self.country_2_dataset, bandwidth_df)
 
     def calculate_bandwidth(self, country, bandwidth_df): 
 
@@ -176,7 +183,7 @@ class KdeDataHandler():
         bandwidth_df.loc[len(bandwidth_df)] = [self.cntr_od, country_name, N, Dm, SD, search_radius]
 
         print(bandwidth_df.head())
-        bandwidth_df.to_csv('calculated_search_radius.csv', sep=',', index = False)
+        bandwidth_df.to_csv('calculated_search_radius_int.csv', sep=',', index = False)
 
 
     def contour_intervalls(self, number_of_intervalls):
@@ -199,16 +206,135 @@ class KdeDataHandler():
         #self.border_data = gpd.read_file('cropped_greatLux.gpkg')
 
         self.border_data = self.border_data.to_crs(epsg = 3035)
-        print("border data printed")
-        print(self.border_data.head())
-        print(self.border_data.crs)
 
 
+    def importing_interreg(self):
+        self.interreg_data = gpd.read_file('NUTS_3_PT__ES2_without_fid.gpkg')
+        self.interreg_data = self.interreg_data.to_crs(epsg = 3035)
 
-    def kde_plot_initializing(self):
+        self.interreg_data = self.interreg_data[(self.interreg_data['Interreg'] == 'TRUE')]
 
-        #firt country
-        self.kde1 = self.kde_plot(self.country_1_coordinates, 0.4)
+        self.int_regions1 = self.selecting_interreg(self.country_1_coordinates)
+        self.int_regions2 = self.selecting_interreg(self.country_2_coordinates)
+
+        self.clipped_data1 = self.clipping_to_interreg(self.country_1_coordinates, self.int_regions1)
+        self.clipped_data1 = self.clipped_data1.reset_index(drop=True)
+        self.clipped_data1['Interreg_ES'] = True
+        
+
+        self.clipped_data2 = self.clipping_to_interreg(self.country_2_coordinates, self.int_regions2)
+        self.clipped_data2 = self.clipped_data2.reset_index(drop=True)
+        self.clipped_data2['Interreg_PT'] = True
+        
+
+        self.merged_country1 = self.merge_clipped_interreg(self.country_1_coordinates, self.clipped_data1)
+        self.merged_country2 = self.merge_clipped_interreg(self.country_2_coordinates, self.clipped_data2)
+
+        self.filtered_merged = self.merge_countries_to_one(self.merged_country1, self.merged_country2)
+
+        self.country1_interreg_data = self.filtered_merged.loc[:, self.filtered_merged.columns.str.endswith('_x')]
+
+        self.country_1_dataset = self.removing_end(self.country1_interreg_data, '_x')
+        
+        self.country_1_dataset = self.country_1_dataset.set_geometry('geometry')
+                # Save the merged GeoDataFrame to a .gpkg file
+        self.country_1_dataset.to_file('ES_KDE_input_data.gpkg', driver='GPKG')
+
+
+        self.country2_interreg_data = self.filtered_merged.loc[:, self.filtered_merged.columns.str.endswith('_y')]
+
+        self.country_2_dataset = self.removing_end(self.country2_interreg_data, '_y')
+        self.country_2_dataset = self.country_2_dataset.set_geometry('geometry')
+        self.country_2_dataset.to_file('PT_KDE_input_data.gpkg', driver='GPKG')
+
+        print("saved")
+
+    def selecting_interreg(self, country):
+
+        country_abb = country.iloc[0]['country_name']
+
+        if country_abb == "ES":
+            self.int_regions = self.interreg_data.loc[self.interreg_data['CNTR_CODE'].isin([country_abb])]
+        
+        elif country_abb == 'PT':
+            self.int_regions = self.interreg_data.loc[self.interreg_data['CNTR_CODE'].isin([country_abb])]
+        
+        return self.int_regions
+    
+    def clipping_to_interreg(self, country, region):
+
+        return gpd.clip(country, region)
+    
+    def merge_clipped_interreg(self, country, clipped_country):
+
+        country_abb = country.iloc[0]['country_name']
+        interreg_column = f'Interreg_{country_abb}'
+
+        self.merged = pd.merge(country, clipped_country[['id', interreg_column]], on = 'id', how = 'left')
+        # fill the NaN values in the new column with False
+        self.merged[interreg_column] = self.merged[interreg_column].fillna(False)
+
+        return self.merged
+    
+    def merge_countries_to_one(self, country1, country2):
+
+        # merge the two GeoDataFrames on the 'id' column
+        merged = country1.merge(country2, on='id')
+
+        merged = merged.set_geometry('geometry_x')
+
+        # create a new column 'Interreg_status' in the merged GeoDataFrame and set its values to True where both 'Interreg_ES' and 'Interreg_PT' are True
+        merged['Interreg_status'] = (merged['Interreg_ES'] == True) & (merged['Interreg_PT'] == True)
+
+        # filter the merged GeoDataFrame to only include rows where 'Interreg_status' is True
+        filtered = merged[merged['Interreg_status'] == True]
+
+        return filtered
+    
+    def removing_end(self, country, letter):
+
+        country_ex = country.copy()
+
+        # loop through all columns and remove '_x'
+        for col in country_ex.columns:
+            if col.endswith(letter):
+                country_ex.rename(columns={col: col[:-2]}, inplace=True)
+
+        print(country_ex.columns)
+        return country_ex
+
+    def kde_plot_initializing_for_interreg(self):
+
+        #first country
+
+        self.kde1 = self.kde_plot(self.country_1_dataset, 0.5)
+        print("KDE plot done")
+        self.country_1_file_name = self.kde_to_gpkg(self.kde1, self.country_1_dataset)
+        print("KDE plot saved as gpkg")
+        self.selected_regions_1 = self.select_region(self.country_1_dataset)
+        print("Region selected")
+        self.country_1_plot = self.read_geo_file(self.country_1_dataset, self.country_1_file_name, self.selected_regions_1)
+        print("Clipped plot saved")
+
+        #second country
+
+        self.kde2 = self.kde_plot(self.country_2_dataset, 0.54)
+        print("KDE plot done")
+        self.country_2_file_name = self.kde_to_gpkg(self.kde2, self.country_2_dataset)
+        print("KDE plot saved as gpkg")
+        self.selected_regions_2 = self.select_region(self.country_2_dataset)
+        print("Region selected")
+        self.country_2_plot = self.read_geo_file(self.country_2_dataset, self.country_2_file_name, self.selected_regions_2)
+        print("Clipped plot saved")
+
+
+        #Merging of country 1 and country 2
+        self.merge_clipped_layer(self.country_1_plot, self.country_2_plot, self.selected_regions_1, self.selected_regions_2)
+
+    def kde_plot_initializing_for_entire_dataset(self):
+
+        #first country
+        self.kde1 = self.kde_plot(self.country_1_coordinates, 0.75)
         print("KDE plot done")
         self.country_1_file_name = self.kde_to_gpkg(self.kde1, self.country_1_coordinates)
         print("KDE plot saved as gpkg")
@@ -218,7 +344,7 @@ class KdeDataHandler():
         print("Clipped plot saved")
 
         #second country
-        self.kde2 = self.kde_plot(self.country_2_coordinates, 1.7)
+        self.kde2 = self.kde_plot(self.country_2_coordinates, 1.05)
         print("KDE plot done")
         self.country_2_file_name = self.kde_to_gpkg(self.kde2, self.country_2_coordinates)
         print("KDE plot saved as gpkg")
@@ -231,8 +357,8 @@ class KdeDataHandler():
         #Merging of country 1 and country 2
         self.merge_clipped_layer(self.country_1_plot, self.country_2_plot, self.selected_regions_1, self.selected_regions_2)
 
-
     def kde_plot(self, country, bw):
+
 
         levels = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1]
 
@@ -364,7 +490,7 @@ class KdeDataHandler():
 
         
         # Save the merged GeoDataFrame to a .gpkg file
-        merged_layers.to_file('countries_merged_ES_PT.gpkg', driver='GPKG')
+        merged_layers.to_file('countries_merged_ES_PT_int.gpkg', driver='GPKG')
 
 
 
